@@ -6,7 +6,7 @@ output:
   pdf_document:
     latex_engine: xelatex
 ---
-
+[Click here for Github repo for code](https://github.com/mikaohayon/ST_HW3)
 ```{r setup, include=FALSE}
 library(ggplot2)
 library(dplyr)
@@ -28,13 +28,26 @@ Lack of Competition Increases Prices
 Gas stations charge more if they lack direct competition in sight.
 *Evidence-*
 ```{r, echo= FALSE}
-# Perform t-test
-t_test_A <- t.test(Price ~ Competitors, data = data)
+library(mosaic)
 
-# Output confidence interval
-cat("95% Confidence Interval for difference in gas prices with/without competitors: [", round(t_test_A$conf.int[1], 4), ",", round(t_test_A$conf.int[2], 4), "]\n")
+# Perform bootstrap with 10,000 Monte Carlo variations
+boot_dist <- do(10000) * {
+  group_1 <- sample(na.omit(data$Price[data$Competitors == "Y"]), replace = TRUE)
+  group_2 <- sample(na.omit(data$Price[data$Competitors == "N"]), replace = TRUE)
+  
+  mean(group_1) - mean(group_2)
+}
+# Compute the bootstrap confidence interval for the mean difference
+conf_bounds <- confint(boot_dist$result, level = 0.95, method = "quantile")
 
-# Create Boxplot of gas prices by competition presence
+# Round the confidence interval
+conf_bounds <- round(conf_bounds, 3)
+
+# Print the mean difference and the 95% confidence interval
+print(round(mean(boot_dist$result), 3))
+print(conf_bounds)
+
+
 ggplot(data, aes(x = Competitors, y = Price, fill = Competitors)) +
   geom_boxplot() +
   labs(title = "Gas Prices by Competition Presence",
@@ -46,9 +59,8 @@ ggplot(data, aes(x = Competitors, y = Price, fill = Competitors)) +
 
 *Conclusion-*
 Based on our experiment results we cannot conclude that there is a statistically significant difference in gas prices based on competition. The confidence interval for the price difference between gas stations with and without competition is
-[ -0.0085 , 0.0554 ]. Since this interval includes 0.we can say with 95% confidence that the presence or absence of visible competitors does not have a clear impact on gas prices in this dataset. Therefore, the theory that gas stations charge more if they lack direct competition is not supported by the data.
+[ -0.054, 0.008	]. Since this interval includes 0.we can say with 95% confidence that the presence or absence of visible competitors does not have a clear impact on gas prices in this dataset. Therefore, the theory that gas stations charge more if they lack direct competition is not supported by the data.
 \pagebreak
-
 
 
 
@@ -60,26 +72,23 @@ The richer the area, the higher the gas prices.
 
 *Evidence-*
 ```{r, echo= FALSE}
-# Ensure necessary libraries are loaded
-library(dplyr)
-library(ggplot2)
+# Create income groups (Low vs High)
+data$income_group <- ifelse(data$Income < median(data$Income, na.rm = TRUE), "Low", "High")
 
-# Create new variable to categorize income (low vs high)
-data <- data %>%
-  mutate(income_group = ifelse(Income < median(Income, na.rm = TRUE), "Low", "High"))
+# Bootstrap with 10,000 Monte Carlo variations
+boot_dist <- do(10000) * {
+  mean(sample(data$Price[data$income_group == "High"], replace = TRUE)) - 
+    mean(sample(data$Price[data$income_group == "Low"], replace = TRUE))
+}
 
-# Calculate the mean gas prices for both income groups
-mean_price_by_group <- data %>%
-  group_by(income_group) %>%
-  summarize(mean_price = mean(Price, na.rm = TRUE))
+# Confidence interval from bootstrap and rounding
+conf_bounds <- confint(boot_dist$result)
+conf_bounds <- round(conf_bounds, 4)
 
-# Perform t-test between low and high-income groups
-t_test <- t.test(Price ~ income_group, data = data)
+# Print results
+print(round(mean(boot_dist$result), 4))
+print(conf_bounds)
 
-# Output the 95% Confidence Interval
-cat("95% Confidence Interval: [", round(t_test$conf.int[1], 4), ",", round(t_test$conf.int[2], 4), "]\n")
-
-# Scatter plot with a regression line showing the correlation between Income and Price
 ggplot(data, aes(x = Income, y = Price)) +
   geom_point(alpha = 0.7, color = "purple") +  
   geom_smooth(method = "lm", se = FALSE, color = "darkblue", linetype = "dashed") +  # Regression line
@@ -91,7 +100,7 @@ ggplot(data, aes(x = Income, y = Price)) +
 ```
 
 *Conclusion-*
-When categorizing incomes in the sample into high or low income, we were able to calculate the mean difference in gas prices between high and low income groups. The boxplot, aswell as the observed confidence interval suggest that there is a positive correlation of gas prices and income with a 95% confidence interval of [ 0.0035 , 0.0657 ] , suggesting that the theory is true and gas prices in areas of higher income are higher than gas prices in lower income areas.
+When categorizing incomes in the sample into high or low income, we were able to calculate the mean difference in gas prices between high and low income groups. The boxplot, aswell as the observed confidence interval suggest that there is a positive correlation of gas prices and income with a 95% confidence interval of [ 0.0052, 0.0647 ] , suggesting that the theory is true and gas prices in areas of higher income are higher than gas prices in lower income areas.
 \pagebreak
 
 
@@ -103,22 +112,18 @@ Gas stations at stoplights charge more.
 
 *Evidence-*
 ```{r, echo=  FALSE}
-# summary stats
-stoplight_summary <- data %>%
-  group_by(Stoplight) %>%
-  summarize(
-    Mean_Price = mean(Price, na.rm = TRUE),
-    SD = sd(Price, na.rm = TRUE),
-    Count = n()
-  )
-print(stoplight_summary)
+# Bootstrap with 10,000 Monte Carlo variations
+boot_dist <- do(10000) * {
+  cor(sample(data$Income, replace = TRUE), sample(data$Price, replace = TRUE))
+}
 
-t_test_C <- t.test(Price ~ Stoplight, data = data)
-mean_diff_C <- diff(t_test_C$estimate)
-conf_int_C <- t_test_C$conf.int
+# Confidence interval from bootstrap and rounding
+conf_bounds <- confint(boot_dist$result)
+conf_bounds <- round(conf_bounds, 4)
+
 # Print results
-cat("Mean Price Difference:", round(mean_diff_C, 4), "\n")
-cat("95% Confidence Interval: [", round(conf_int_C[1], 4), ",", round(conf_int_C[2], 4), "]\n")
+print(round(mean(boot_dist$result), 4))
+print(conf_bounds)
 
 ggplot(data, aes(x = Stoplight, y = Price, fill = Stoplight)) +
   geom_boxplot() +
@@ -131,7 +136,7 @@ ggplot(data, aes(x = Stoplight, y = Price, fill = Stoplight)) +
 
 *Conclusion-*
 
-Based on our analysis, we cannot conclude that there is a statistically significant difference in gas prices between stations located at stoplights and those not located at stoplights. The confidence interval for the price difference between these two groups is [-0.0319, 0.0385]. Since this interval includes 0, we can say with 95% confidence that the location of a gas station in relation to a stoplight does not have a clear impact on its gas prices. Therefore, the theory that gas stations charge more when they are located at stoplights is not supported by the data.
+Based on our analysis, we cannot conclude that there is a statistically significant difference in gas prices between stations located at stoplights and those not located at stoplights. The confidence interval for the price difference between these two groups is [-0.1924, 0.2007	]. Since this interval includes 0, we can say with 95% confidence that the location of a gas station in relation to a stoplight does not have a clear impact on its gas prices. Therefore, the theory that gas stations charge more when they are located at stoplights is not supported by the data.
 \pagebreak
 
 
@@ -142,34 +147,35 @@ Gas stations with direct highway access charge more.
 
 *Evidence-*
 ```{r, echo= FALSE}
-# Compute summary statistics
-highway_summary <- data %>%
-  group_by(Highway) %>%
-  summarize(
-    Mean_Price = mean(Price, na.rm = TRUE),
-    SD = sd(Price, na.rm = TRUE),
-    Count = n()
-  )
-print(highway_summary)
-t_test_D <- t.test(Price ~ Highway, data = data)
-conf_int_D <- t_test_D$conf.int
+library(mosaic)
+
+# Bootstrap with 10,000 Monte Carlo variations
+boot_dist <- do(10000) * {
+  # Remove NAs before sampling
+  group_1 <- sample(na.omit(data$Price[data$Highway == "Y"]), replace = TRUE)
+  group_2 <- sample(na.omit(data$Price[data$Highway == "N"]), replace = TRUE)
+  
+  mean(group_1) - mean(group_2)
+}
+
+# Confidence interval from bootstrap and rounding
+conf_bounds <- confint(boot_dist$result)
+conf_bounds <- round(conf_bounds, 3)
+
 # Print results
-cat("95% Confidence Interval: [", round(conf_int_D[1], 4), ",", round(conf_int_D[2], 4), "]\n")
-
-# Dot plot
-ggplot(highway_summary, aes(x = Highway, y = Mean_Price, color = Highway)) +
-  geom_point(size = 4) +  # Plotting the means
-  geom_errorbar(aes(ymin = Mean_Price - SD, ymax = Mean_Price + SD), width = 0.2, size = 1.2) +  # Thicker error bars with wider width
-  scale_color_manual(values = c("blue", "red")) +  # Custom colors for the groups
-  labs(title = "Mean Gas Prices by Highway Access",
+print(round(mean(boot_dist$result), 3))
+print(conf_bounds)
+ggplot(data, aes(x = Highway, y = Price, fill = Highway)) +
+  geom_boxplot() +  # Boxplot showing the distribution of prices
+  scale_fill_manual(values = c("Y" = "lightblue", "N" = "lightcoral")) +  # Custom colors for Highway (Y) vs No Highway (N)
+  labs(title = "Price Distribution by Highway Access",
        x = "Highway Access",
-       y = "Mean Gas Price ($)") +
+       y = "Gas Price ($)") +
   theme_minimal()
-
 ```
 
 *Conclusion-*
-Based on our experiment results we can conclude that there is a statistically significant difference in gas prices based on highway access. The 95% confidence interval for the price difference between gas stations with and without highway access is [-0.0834, -0.0083]. Since this interval is entirely negative and does not include 0, we can say with 95% confidence that gas stations with highway access charge higher prices on average. Therefore, the theory that highway-access gas stations charge more is supported by the data.
+Based on our experiment results we can conclude that there is a statistically significant difference in gas prices based on highway access. The 95% confidence interval for the price difference between gas stations with and without highway access is [0.01,	0.08]. Since this interval is entirely positive and does not include 0, we can say with 95% confidence that gas stations with highway access charge higher prices on average. Therefore, the theory that highway-access gas stations charge more is supported by the data.
 \pagebreak
 
 ## Theory E: Shell Charges More
@@ -179,23 +185,22 @@ Shell gas stations charge more than other brands.
 
 *Evidence-*
 ```{r, echo= FALSE}
-# group by brand and calculate mean and sd
-brand_summary <- data %>%
-  group_by(Brand) %>%
-  summarize(
-    Mean_Price = mean(Price, na.rm = TRUE),
-    SD = sd(Price, na.rm = TRUE),
-  )
-print(brand_summary)
+# Bootstrap w
+boot_dist <- do(10000) * {
+  # Remove NAs before sampling and compare Shell (Y) with others (N)
+  group_1 <- sample(na.omit(data$Price[data$Brand == "Shell"]), replace = TRUE)
+  group_2 <- sample(na.omit(data$Price[data$Brand != "Shell"]), replace = TRUE)
+  
+  mean(group_1) - mean(group_2)
+}
 
-# test for price differences across brands
-model_E <- lm(Price ~ Brand, data = data)
-conf_int_E <- confint(model_E)
+# Confidence interval from bootstrap and rounding
+conf_bounds <- confint(boot_dist$result)
+conf_bounds <- round(conf_bounds, 3)
 
-# Extract Shell coefficient
-shell_effect <- coef(summary(model_E))["BrandShell", ]
-# Print 
-cat("95% Confidence Interval: [", round(conf_int_E["BrandShell", 1], 4), ",", round(conf_int_E["BrandShell", 2], 4), "]\n")
+# Print results
+print(round(mean(boot_dist$result), 3))
+print(conf_bounds)
 
 ggplot(data, aes(x = Brand, y = Price, fill = Brand)) +
   geom_boxplot() +
@@ -203,12 +208,10 @@ ggplot(data, aes(x = Brand, y = Price, fill = Brand)) +
        x = "Brand",
        y = "Gas Price ($)") +
   theme_minimal()
-
-
 ```
 
 *Conclusion-*
-Because the 95% confidence interval for gas prices by brand of gas station is [ -0.0505 , 0.0493 ] and includes 0, we do not have statistical significance that Shell charges more, and our data does not support the theory.
+Because the 95% confidence interval for gas prices by brand of gas station is [ -0.009, 0.065	 ] and includes 0, we do not have statistical significance that Shell charges more, and our data does not support the theory.
 \pagebreak
 
 
@@ -228,6 +231,8 @@ boot_res <- do(10000) * { mean(resample(data_2011$mileage)) }
 round(confint(boot_res, level = 0.95)[, c("lower", "upper")], 2)
 
 ```
+The confidence interval suggests that the mileage for 2011 S-Class 63 AMGS is between 26266.67 and	31792.46 miles, with 95% certainty
+
 *Proportion of S-Class 550s that were painted black.*
 ```{r, echo=FALSE}
 
@@ -243,6 +248,7 @@ boot_black <- do(10000) * { mean(resample(data_2014$isBlack)) }
 round(confint(boot_black, level = 0.95)[, c("lower", "upper")], 3)
 
 ```
+The confidence interval suggests that the Proportion of S-Class 550s that were painted black is between .41 to .45 with 95 percent certainty.
 \pagebreak
 
 
@@ -266,9 +272,8 @@ boot_diff_A <- do(10000) * {
   mean_earl   <- mean(resample(filter(data_A, Show == "My Name is Earl")$Q1_Happy), na.rm = TRUE)
   mean_living - mean_earl
 }
-
-
 round(confint(boot_diff_A, level = 0.95)[, c("lower", "upper")], 3)
+
 ggplot(boot_diff_A, aes(x = result)) +
   geom_density(fill = "skyblue", alpha = 0.7) +
   geom_vline(aes(xintercept = 0), color = "red", linetype = "dashed") +
